@@ -345,6 +345,18 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         setIsSubmitting(false);
         return;
       }
+      // approverRemarks is optional here, but if something was typed it must
+      // not be pure whitespace (e.g. user hits spacebar a few times).
+      if (approverRemarks && approverRemarks.trim() === "") {
+        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Normalize to trimmed values so nothing whitespace-padded gets persisted.
+      const trimmedUTRNumber = UTRNumber.trim();
+      const trimmedUTRRemarks = UTRRemarks.trim();
+      const trimmedApproverRemarks = approverRemarks.trim();
 
       // Upload UTR attachments to CapexPaymentUTRDocs (if any new files were picked)
       if (utrFiles.length > 0) {
@@ -366,7 +378,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Paid",
-        Comment: UTRRemarks,
+        Comment: trimmedUTRRemarks,
         Date: new Date().toISOString(),
       });
 
@@ -374,10 +386,10 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarks,
           UTRDate: UTRDate ? new Date(UTRDate) : null,
-          UTRNumber: UTRNumber,
-          UTRRemarks: UTRRemarks,
+          UTRNumber: trimmedUTRNumber,
+          UTRRemarks: trimmedUTRRemarks,
           Status: "Paid",
           CurrentApproverId: null,
           PendingWth: "",
@@ -405,6 +417,13 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         setIsSubmitting(false);
         return;
       }
+      if (approverRemarks && approverRemarks.trim() === "") {
+        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        setIsSubmitting(false);
+        return;
+      }
+      const trimmedUTRRemarksSB = UTRRemarks.trim();
+      const trimmedApproverRemarksSB = approverRemarks.trim();
 
       const history = itemData.WorkflowHistory
         ? typeof itemData.WorkflowHistory === "string"
@@ -415,7 +434,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Send Back",
-        Comment: UTRRemarks,
+        Comment: trimmedUTRRemarksSB,
         Date: new Date().toISOString(),
       });
 
@@ -428,7 +447,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarksSB,
           Status: "Send Back",
           WorkflowHistory: JSON.stringify(history),
         });
@@ -454,6 +473,13 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         setIsSubmitting(false);
         return;
       }
+      if (approverRemarks && approverRemarks.trim() === "") {
+        await Swal.fire({ icon: "warning", title: "Validation Error", text: "Approver Remarks cannot contain only spaces.", confirmButtonText: "OK" });
+        setIsSubmitting(false);
+        return;
+      }
+      const trimmedUTRRemarksRej = UTRRemarks.trim();
+      const trimmedApproverRemarksRej = approverRemarks.trim();
 
       const history = itemData.WorkflowHistory
         ? typeof itemData.WorkflowHistory === "string"
@@ -464,7 +490,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Rejected",
-        Comment: UTRRemarks,
+        Comment: trimmedUTRRemarksRej,
         Date: new Date().toISOString(),
       });
 
@@ -477,7 +503,7 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarksRej,
           Status: "Reject",
           CurrentApproverId: null,
           PendingWth: "",

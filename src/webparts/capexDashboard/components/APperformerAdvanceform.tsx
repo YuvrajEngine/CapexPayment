@@ -244,6 +244,8 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         });
         return;
       }
+      // Trim-aware: a Voucher Number made up only of spaces must be rejected,
+      // not just an empty string.
       if (!voucherNumber || voucherNumber.trim() === "") {
         await Swal.fire({
           icon: "warning",
@@ -253,6 +255,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         });
         return;
       }
+      // Trim-aware: Remarks made up only of spaces must be rejected too.
       if (!approverRemarks || approverRemarks.trim() === "") {
         await Swal.fire({
           icon: "warning",
@@ -262,6 +265,10 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         });
         return;
       }
+
+      // Persist trimmed values only — no leading/trailing whitespace ever saved.
+      const trimmedVoucherNumber = voucherNumber.trim();
+      const trimmedApproverRemarks = approverRemarks.trim();
 
       const flow = itemData.ApprovalMatrix
         ? JSON.parse(itemData.ApprovalMatrix)
@@ -290,7 +297,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Approved",
-        Comment: approverRemarks,
+        Comment: trimmedApproverRemarks,
         Date: new Date().toISOString(),
       });
 
@@ -298,9 +305,9 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarks,
           VoucherDate: voucherDate ? new Date(voucherDate) : null,
-          VoucherNumber: voucherNumber,
+          VoucherNumber: trimmedVoucherNumber,
           Status: "Pending for UTR Update",
           WorkflowHistory: JSON.stringify(history),
         });
@@ -331,6 +338,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
     actionLock.current = true;
     setIsSubmitting(true);
     try {
+      // Trim-aware: Remarks made up only of spaces must be rejected.
       if (!approverRemarks || approverRemarks.trim() === "") {
         await Swal.fire({
           icon: "warning",
@@ -340,6 +348,8 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         });
         return;
       }
+      const trimmedApproverRemarksSB = approverRemarks.trim();
+
       let flow: any[] = [];
       try {
         flow =
@@ -390,7 +400,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Send Back",
-        Comment: approverRemarks,
+        Comment: trimmedApproverRemarksSB,
         Date: new Date().toISOString(),
         CurrentStatus: "Send Back",
       });
@@ -399,7 +409,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarksSB,
           Status: "Send Back",
           WorkflowHistory: JSON.stringify(history),
         });
@@ -430,6 +440,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
     actionLock.current = true;
     setIsSubmitting(true);
     try {
+      // Trim-aware: Remarks made up only of spaces must be rejected.
       if (!approverRemarks || approverRemarks.trim() === "") {
         await Swal.fire({
           icon: "warning",
@@ -439,6 +450,8 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         });
         return;
       }
+      const trimmedApproverRemarksRej = approverRemarks.trim();
+
       let flow: any[] = [];
       try {
         flow =
@@ -484,7 +497,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
       history.push({
         CurrentApprover: context.pageContext.user.displayName,
         ActionTaken: "Rejected",
-        Comment: approverRemarks,
+        Comment: trimmedApproverRemarksRej,
         Date: new Date().toISOString(),
         CurrentStatus: "Reject",
       });
@@ -493,7 +506,7 @@ const APperformerAdvanceform: React.FC<IProps> = ({
         .getByTitle("CapexPayment")
         .items.getById(itemData.ID)
         .update({
-          ApproverRemarks: approverRemarks,
+          ApproverRemarks: trimmedApproverRemarksRej,
           Status: "Reject",
           WorkflowHistory: JSON.stringify(history),
         });
