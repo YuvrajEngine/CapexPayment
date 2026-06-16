@@ -387,7 +387,7 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
               <div className="col-md-12">
                 {workflowHistory.length === 0 ? (<p>No history available</p>) : (
                   <table className="workflow-table" style={{ width: "100%" }}>
-                    <thead>
+                    <thead className ="WorkFlow-thead">
                       <tr>
                         <th style={{ padding: "8px", textAlign: "left" }}>Action By</th>
                         <th style={{ padding: "8px", textAlign: "left" }}>Action Taken</th>

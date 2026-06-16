@@ -15,6 +15,43 @@ interface UserDashboardProps {
   context: any;
 }
 
+// ================= HELPERS (same pattern as CustomerPO ApproverDashboard) =================
+// Capex WorkflowHistory entries store the actor under "CurrentApprover" (display name)
+// instead of "ActionBy" like CustomerPO, and use "ActionTaken" instead of "Action".
+interface IWorkflowHistoryEntry {
+  CurrentApprover?: string;
+  ActionTaken?: string;
+  Comment?: string;
+  Date?: string;
+}
+
+const parseWorkflowHistory = (raw?: string | any[] | null): IWorkflowHistoryEntry[] => {
+  if (!raw) return [];
+  try {
+    const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+// Checks whether the logged-in user is the one who actually performed the given
+// action (Paid / Rejected) on this item, rather than relying on Status +
+// CurrentApproverId — CurrentApproverId is cleared to null once an item is
+// Paid or Rejected, so it can never be used to find those items afterwards.
+const userTookAction = (
+  rawHistory: string | any[] | null | undefined,
+  loggedInUser: string,
+  action: "Paid" | "Reject",
+): boolean => {
+  const history = parseWorkflowHistory(rawHistory);
+  return history.some(
+    (entry) =>
+      entry.CurrentApprover?.trim().toLowerCase() === loggedInUser &&
+      entry.ActionTaken?.trim().toLowerCase() === action.toLowerCase(),
+  );
+};
+
 const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const sp = spfi().using(SPFx(context));
   const [formType, setFormType] = useState<"new" | "view" | "approve" | null>(null);
@@ -68,17 +105,22 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     }
   };
 
+  // ================= FETCH DATA =================
+  // Only "My Request" (Pending for Approval) can be filtered server-side by
+  // CurrentApproverId, since that field is still populated for pending items.
+  // Paid and Rejected are fetched broadly here and filtered client-side against
+  // WorkflowHistory (see filteredData below) — same approach as CustomerPO.
   const getCapexData = async () => {
     try {
-      const currentUser = await sp.web.currentUser();
       let filterQuery = "";
 
       if (activeMenu === "My Request") {
+        const currentUser = await sp.web.currentUser();
         filterQuery = `Status eq 'Pending for Approval' and CurrentApproverId eq ${currentUser.Id}`;
       } else if (activeMenu === "Paid") {
-        filterQuery = `Status eq 'Paid' and CurrentApproverId eq ${currentUser.Id}`;
+        filterQuery = `Status eq 'Paid'`;
       } else if (activeMenu === "Rejected") {
-        filterQuery = `Status eq 'Reject' and CurrentApproverId eq ${currentUser.Id}`;
+        filterQuery = `Status eq 'Reject'`;
       }
 
       const items = await sp.web.lists
@@ -87,6 +129,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
           "*", "ID", "Title", "Created", "EmployeeName", "VendorName", "VendorCode",
           "PONumber", "RequestedAmountforPayment", "Status", "CurrentApproverId",
           "CurrentApprover/Title", "CurrentApprover/EMail", "PendingWth", "Author/EMail",
+          "WorkflowHistory",
         )
         .expand("Author", "CurrentApprover")
         .filter(filterQuery)
@@ -103,6 +146,7 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
         amount: item.RequestedAmountforPayment || 0,
         pendingWith: item.CurrentApprover?.Title || item.PendingWth || "",
         status: item.Status || "",
+        workflowHistory: item.WorkflowHistory || null,
       }));
 
       setData(formatted);
@@ -114,10 +158,18 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
   const filteredData = data.filter((item) => {
     const text = searchText.toLowerCase();
     const status = statusFilter.toLowerCase();
+    const loggedInUser = currentUserName?.trim().toLowerCase() || "";
 
     let menuFilter = true;
-    if (activeMenu === "Paid") menuFilter = item.status?.toLowerCase() === "paid";
-    else if (activeMenu === "Rejected") menuFilter = item.status?.toLowerCase() === "reject";
+    if (activeMenu === "Paid") {
+      menuFilter =
+        item.status?.toLowerCase() === "paid" &&
+        userTookAction(item.workflowHistory, loggedInUser, "Paid");
+    } else if (activeMenu === "Rejected") {
+      menuFilter =
+        item.status?.toLowerCase() === "reject" &&
+        userTookAction(item.workflowHistory, loggedInUser, "Reject");
+    }
 
     return (
       menuFilter &&
@@ -141,6 +193,10 @@ const ApproverDashboard: React.FC<UserDashboardProps> = ({ context }) => {
     if (!context) return;
     void getCapexData();
   }, [context, activeMenu]);
+
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [activeMenu, searchText, statusFilter]);
 
   if (showForm) {
     if (formType === "approve") {
