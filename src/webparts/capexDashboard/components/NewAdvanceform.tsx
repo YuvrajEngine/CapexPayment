@@ -24,7 +24,6 @@ interface IPreviousAdvance {
 }
 
 const NewAdvanceform = ({ context, onClose }: any) => {
-  // ✅ REMOVED: useNavigate() — form is a child component, not a route
   const submitRef = useRef(false);
   const draftRef = useRef(false);
   const sp = spfi().using(SPFx(context));
@@ -456,13 +455,13 @@ const NewAdvanceform = ({ context, onClose }: any) => {
             ) : (
               <div className="displayWF">
                 <ul className="approval-flow">
-                  <li className="approval-step">
+                  <li className="approval-step active">
                     Initiator - {employee.EmployeeName}
                   </li>
                   {approvalMatrix.map((a, index) => (
                     <li
                       key={index}
-                      className={`approval-step ${index === 0 ? "active" : ""}`}
+                      className="approval-step upcoming"
                     >
                       {a.Role} - {a.Name}
                     </li>
