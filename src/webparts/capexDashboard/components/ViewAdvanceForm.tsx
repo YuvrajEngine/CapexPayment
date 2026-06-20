@@ -22,15 +22,11 @@ interface IPreviousAdvance {
   Status: string;
 }
 
-// Library names kept as constants so requestor docs and UTR docs can never
-// accidentally be pointed at the same library again.
 const REQUESTOR_DOCS_LIBRARY = "CapexPaymentDocs";
 const UTR_DOCS_LIBRARY = "CapexPaymentUTRDocs";
 
 const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
-  // Requestor attachments (root folder files only) - from CapexPaymentDocs
   const [attachments, setAttachments] = useState<any[]>([]);
-  // UTR attachments - from CapexPaymentUTRDocs ONLY
   const [utrAttachments, setUtrAttachments] = useState<any[]>([]);
 
   const sp = spfi().using(SPFx(context));
@@ -39,16 +35,23 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const [previousAdvances, setPreviousAdvances] = useState<IPreviousAdvance[]>([]);
   const [mrnNumber, setMrnNumber] = useState("");
   const [mrnDate, setMrnDate] = useState("");
+  const [mrnBasicAmount, setMrnBasicAmount] = useState("");
+  const [mrnGstAmount, setMrnGstAmount] = useState("");
+  const [mrnOtherAmount, setMrnOtherAmount] = useState("");
   const [mrnAmount, setMrnAmount] = useState("");
   const [requestedAmount, setRequestedAmount] = useState("");
   const [finalPayment, setFinalPayment] = useState("");
   const [installationDetails, setInstallationDetails] = useState("");
+  const [installationRequestNumber, setInstallationRequestNumber] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [selectedVendorName, setSelectedVendorName] = useState("");
   const [selectedVendorCode, setSelectedVendorCode] = useState("");
   const [poNumber, setPoNumber] = useState("");
   const [poDate, setPoDate] = useState("");
   const [poTerms, setPoTerms] = useState("");
+  const [poBasicAmount, setPoBasicAmount] = useState("");
+  const [poGstAmount, setPoGstAmount] = useState("");
+  const [poOtherAmount, setPoOtherAmount] = useState("");
   const [poAmount, setPoAmount] = useState("");
   const [requesterRemarks, setRequesterRemarks] = useState("");
   const [approverRemarks, setApproverRemarks] = useState("");
@@ -79,7 +82,6 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
-  // Requestor attachments — ALWAYS from CapexPaymentDocs, never from the UTR library
   const getAttachments = async (capexId: string) => {
     try {
       if (!capexId) return;
@@ -96,9 +98,6 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     }
   };
 
-  // UTR attachments — ALWAYS from CapexPaymentUTRDocs, never from the requestor docs library.
-  // This folder only exists once the AP Performer has uploaded UTR proof, so a missing
-  // folder is expected/normal and is swallowed silently (empty list shown in UI).
   const getUTRAttachments = async (capexId: string) => {
     try {
       if (!capexId) return;
@@ -141,15 +140,22 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     setPoNumber(formData.PONumber || "");
     setPoDate(formData.PODate?.split("T")[0] || "");
     setPoTerms(formData.POPaymentTerms || "");
+    setPoBasicAmount(formData.POBasicAmount || "");
+    setPoGstAmount(formData.POGSTAmount || "");
+    setPoOtherAmount(formData.POOtherAmount || "");
     setPoAmount(formData.POAmount || "");
     setSelectedVendorCode(formData.VendorCode || "");
     setSelectedVendorName(formData.VendorName || "");
     setMrnNumber(formData.MRNNumber || "");
     setMrnDate(formData.MRNDtae?.split("T")[0] || "");
+    setMrnBasicAmount(formData.MRNBasicAmount || "");
+    setMrnGstAmount(formData.MRNGSTAmount || "");
+    setMrnOtherAmount(formData.MRNOtherAmount || "");
     setMrnAmount(formData.MRNAmountwithGST || "");
     setRequestedAmount(formData.RequestedAmountforPayment || "");
     setFinalPayment(formData.FinalPaymentAgainstPO ? "Yes" : "No");
     setInstallationDetails(formData.InstallationDetails || "");
+    setInstallationRequestNumber(formData.InstallationRequestNumber || "");
     setRequesterRemarks(formData.RequesterRemarks || "");
     setApproverRemarks(formData.ApproverRemarks || "");
     setVoucherDate(formData.VoucherDate?.split("T")[0] || "");
@@ -159,8 +165,8 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     setUTRRemarks(formData.UTRRemarks || "");
 
     if (formData.CapexId) {
-      void getAttachments(formData.CapexId);     // -> CapexPaymentDocs
-      void getUTRAttachments(formData.CapexId);  // -> CapexPaymentUTRDocs
+      void getAttachments(formData.CapexId);     
+      void getUTRAttachments(formData.CapexId);  
     }
 
     if (formData?.ApprovalMatrix) {
@@ -192,21 +198,6 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const handleExit = () => { if (onClose) onClose(); else window.location.reload(); };
 
-  // ===== Ribbon color logic =====
-  // Colors: "approved" = green, "active" = orange (current approver), "upcoming" = yellow,
-  // "rejected" = red. Driven by the overall request Status (formData.Status), the
-  // per-step Status inside approvalMatrix, and — for Send Back, where CurrentApprover
-  // is cleared — the WorkflowHistory entries in the CapexPayment list.
-  //
-  // Rules:
-  // - Paid: Initiator + every approver step = green.
-  // - Reject: the step that has Status "Reject" = red; steps before it = green;
-  //   steps after it = yellow.
-  // - Send Back: CurrentApprover goes blank, so we can't trust matrix "In Progress".
-  //   The Initiator (requester) = orange, every approver step = yellow.
-  // - Otherwise (still in progress, e.g. Pending for Approval / Pending for Vouching
-  //   Update / Pending for UTR Update): steps already Approved = green, the step
-  //   with Status "In Progress" = orange, steps after that = yellow.
   const overallStatus: string = formData?.Status || "";
 
   const buildRibbonSteps = () => {
@@ -233,16 +224,11 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     }
 
     if (overallStatus === "Send Back" || overallStatus === "Draft") {
-      // CurrentApprover is blank by this point for Send Back, and for Draft the
-      // request hasn't been submitted yet — either way the requester is the
-      // active step (orange), not "done" (green), and every approver step is
-      // upcoming (yellow).
       return steps.map((s) =>
         s.Role === "Initiator" ? { ...s, _color: "active" } : { ...s, _color: "upcoming" },
       );
     }
 
-    // Default: still in progress through the approval chain.
     return steps.map((s) => {
       if (s.Status === "Approved") return { ...s, _color: "approved" };
       if (s.Status === "In Progress") return { ...s, _color: "active" };
@@ -252,19 +238,13 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";   // green
-      case "active": return "active";       // orange — current approver / send-back target
-      case "upcoming": return "upcoming";   // yellow — not yet reached
-      case "rejected": return "rejected";   // red
+      case "approved": return "approved";   
+      case "active": return "active";       
+      case "upcoming": return "upcoming";   
+      case "rejected": return "rejected";   
       default: return "";
     }
   };
-  // Add these rules to advanced.scss if not already present:
-  //   .approval-step.approved { background-color: green; color: #fff; }
-  //   .approval-step.active   { background-color: orange; color: #fff; }
-  //   .approval-step.upcoming { background-color: #f5d800; color: #333; }
-  //   .approval-step.rejected { background-color: red; color: #fff; }
-
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row"><div className="col-md-12"><div className="Main-Boxpoup">
@@ -305,14 +285,19 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
           <div className="heading1" style={{ marginTop: "10px" }}><label>Vendor & PO</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">
-              <div className="col-md-4"><label className="font">Vendor Code</label> : &nbsp;&nbsp;<label className="fonttext">{selectedVendorCode}</label></div>
               <div className="col-md-4"><label className="font">Vendor Name</label> : &nbsp;&nbsp;<label className="fonttext">{selectedVendorName}</label></div>
+              <div className="col-md-4"><label className="font">Vendor Code</label> : &nbsp;&nbsp;<label className="fonttext">{selectedVendorCode}</label></div>
               <div className="col-md-4"><label className="font">PO Number</label> : &nbsp;&nbsp;<label className="fonttext">{poNumber}</label></div>
             </div>
             <div className="row mb-20">
               <div className="col-md-4"><label className="font">PO Date</label> : &nbsp;&nbsp;<label className="fonttext">{poDate}</label></div>
-              <div className="col-md-4"><label className="font">PO Amount</label> : &nbsp;&nbsp;<label className="fonttext">{poAmount}</label></div>
               <div className="col-md-4"><label className="font">PO Payment Terms</label> : &nbsp;&nbsp;<label className="fonttext">{poTerms}</label></div>
+              <div className="col-md-4"><label className="font">PO Basic Amount</label> : &nbsp;&nbsp;<label className="fonttext">{poBasicAmount}</label></div>
+            </div>
+            <div className="row mb-20">
+              <div className="col-md-4"><label className="font">PO GST Amount</label> : &nbsp;&nbsp;<label className="fonttext">{poGstAmount}</label></div>
+              <div className="col-md-4"><label className="font">PO Other Amount</label> : &nbsp;&nbsp;<label className="fonttext">{poOtherAmount}</label></div>
+              <div className="col-md-4"><label className="font">Total PO Amount</label> : &nbsp;&nbsp;<label className="fonttext">{poAmount}</label></div>
             </div>
           </div>
 
@@ -321,7 +306,12 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             <div className="row mb-20">
               <div className="col-md-4"><label className="font">MRN Number</label> : &nbsp;&nbsp;<label className="fonttext">{mrnNumber}</label></div>
               <div className="col-md-4"><label className="font">MRN Date</label> : &nbsp;&nbsp;<label className="fonttext">{mrnDate}</label></div>
-              <div className="col-md-4"><label className="font">MRN Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnAmount}</label></div>
+              <div className="col-md-4"><label className="font">MRN Basic Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnBasicAmount}</label></div>
+            </div>
+            <div className="row mb-20">
+              <div className="col-md-4"><label className="font">MRN GST Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnGstAmount}</label></div>
+              <div className="col-md-4"><label className="font">MRN Other Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnOtherAmount}</label></div>
+              <div className="col-md-4"><label className="font">Total MRN Amount</label> : &nbsp;&nbsp;<label className="fonttext">{mrnAmount}</label></div>
             </div>
             <div className="row mb-20">
               <div className="col-md-4"><label className="font">Requested Amount</label> : &nbsp;&nbsp;<label className="fonttext">{requestedAmount}</label></div>
@@ -383,6 +373,11 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                 <div className="col-md-6"><label className="font">Installation Details</label> : &nbsp;&nbsp;<label className="fonttext">{installationDetails}</label></div>
               </div>
             )}
+            {finalPayment === "No" && (
+              <div className="row mb-20">
+                <div className="col-md-6"><label className="font">Installation Request Number</label> : &nbsp;&nbsp;<label className="fonttext">{installationRequestNumber}</label></div>
+              </div>
+            )}
           </div>
 
           <div className="heading1" style={{ marginTop: "10px" }}><label>Requester Remarks</label></div>
@@ -392,7 +387,6 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
             </div>
           </div>
 
-          {/* Requestor Attachments — root folder only, from CapexPaymentDocs */}
           <div className="heading1" style={{ marginTop: "10px" }}><label>Upload Document</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">
@@ -408,14 +402,14 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
           </div>
 
           {/* Voucher Details */}
-          <div className="main-formcontainer" style={{ marginTop: "10px" }}>
+          <div className="heading1" style={{ marginTop: "10px" }}><label>Voucher Details</label></div>
+          <div className="main-formcontainer">
             <div className="row mb-20">
               <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
               <div className="col-md-6"><label className="font">Voucher Number</label> : &nbsp;&nbsp;<label className="fonttext">{VouchingNumber}</label></div>
             </div>
           </div>
 
-          {/* UTR Details — UTR fields + UTR Attachments shown together, sourced ONLY from CapexPaymentUTRDocs */}
           <div className="heading1" style={{ marginTop: "10px" }}><label>UTR Details</label></div>
           <div className="main-formcontainer">
             <div className="row mb-20">

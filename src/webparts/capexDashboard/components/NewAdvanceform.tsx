@@ -47,16 +47,36 @@ const NewAdvanceform = ({ context, onClose }: any) => {
   const [vendors, setVendors] = useState<IVendor[]>([]);
   const [finalPayment, setFinalPayment] = useState("");
   const [installationDetails, setInstallationDetails] = useState("");
-  const [poAmount, setPoAmount] = useState("");
+  // PO Amount split fields (Total PO Amount is derived/computed below)
+  const [poBasicAmount, setPoBasicAmount] = useState("");
+  const [poGstAmount, setPoGstAmount] = useState("");
+  const [poOtherAmount, setPoOtherAmount] = useState("");
   const [poNumber, setPoNumber] = useState("");
   const [poDate, setPoDate] = useState("");
   const [poTerms, setPoTerms] = useState("");
   const [mrnNumber, setMrnNumber] = useState("");
   const [mrnDate, setMrnDate] = useState("");
-  const [mrnAmount, setMrnAmount] = useState("");
+  // MRN Amount split fields (Total MRN Amount is derived/computed below)
+  const [mrnBasicAmount, setMrnBasicAmount] = useState("");
+  const [mrnGstAmount, setMrnGstAmount] = useState("");
+  const [mrnOtherAmount, setMrnOtherAmount] = useState("");
   const [requestedAmount, setRequestedAmount] = useState("");
   const [requesterRemarks, setRequesterRemarks] = useState("");
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
+  // Shown when "Whether this is the Final Payment against the PO" = No
+  const [installationRequestNumber, setInstallationRequestNumber] =
+    useState("");
+
+  // Derived totals - sum of basic, GST & other amount
+  const totalPoAmount =
+    (Number(poBasicAmount) || 0) +
+    (Number(poGstAmount) || 0) +
+    (Number(poOtherAmount) || 0);
+
+  const totalMrnAmount =
+    (Number(mrnBasicAmount) || 0) +
+    (Number(mrnGstAmount) || 0) +
+    (Number(mrnOtherAmount) || 0);
 
   const handleNumberChange = (value: string, setter: any) => {
     const regex = /^\d*\.?\d*$/;
@@ -259,26 +279,35 @@ const NewAdvanceform = ({ context, onClose }: any) => {
       errors.push("Please select PO Date");
     if (poDate > localDate) errors.push("PO date cannot be a future date");
     if (!poTerms || poTerms.trim() === "") errors.push("Please enter PO Terms");
-    if (!poAmount || poAmount.trim() === "")
-      errors.push("Please enter PO Amount");
+    if (!poBasicAmount || poBasicAmount.trim() === "")
+      errors.push("Please enter PO Basic Amount");
+    if (!poGstAmount || poGstAmount.trim() === "")
+      errors.push("Please enter PO GST Amount");
+    if (!poOtherAmount || poOtherAmount.trim() === "")
+      errors.push("Please enter PO Other Amount");
     if (!mrnNumber || mrnNumber.trim() === "")
       errors.push("Please enter MRN Number");
     if (!mrnDate || mrnDate === "Invalid Date")
       errors.push("Please select MRN Date");
     if (mrnDate > localDate) errors.push("MRN date cannot be a future date");
-    if (!mrnAmount || mrnAmount.trim() === "")
-      errors.push("Please enter MRN Amount");
+    if (!mrnBasicAmount || mrnBasicAmount.trim() === "")
+      errors.push("Please enter MRN Basic Amount");
+    if (!mrnGstAmount || mrnGstAmount.trim() === "")
+      errors.push("Please enter MRN GST Amount");
+    if (!mrnOtherAmount || mrnOtherAmount.trim() === "")
+      errors.push("Please enter MRN Other Amount");
     if (!requestedAmount || requestedAmount.trim() === "")
       errors.push("Please enter Requested Amount");
     if (finalPayment === "Yes" && !installationDetails)
       errors.push("Please enter Installation Details");
+    if (
+      finalPayment === "No" &&
+      (!installationRequestNumber || installationRequestNumber.trim() === "")
+    )
+      errors.push("Please enter Installation Request Number");
     if (!attachments || attachments.length === 0)
       errors.push("Please upload attachment");
-    if (
-      requestedAmount &&
-      mrnAmount &&
-      Number(requestedAmount) > Number(mrnAmount)
-    )
+    if (requestedAmount && totalMrnAmount && Number(requestedAmount) > totalMrnAmount)
       errors.push(
         "Requested Amount should not be greater than MRN Amount (GST)",
       );
@@ -327,15 +356,23 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         PONumber: poNumber,
         PODate: poDate ? new Date(poDate) : null,
         POPaymentTerms: poTerms,
-        POAmount: poAmount ? poAmount.toString() : "",
+        POBasicAmount: poBasicAmount ? poBasicAmount.toString() : "",
+        POGSTAmount: poGstAmount ? poGstAmount.toString() : "",
+        POOtherAmount: poOtherAmount ? poOtherAmount.toString() : "",
+        POAmount: totalPoAmount ? totalPoAmount.toString() : "",
         MRNNumber: mrnNumber,
         MRNDtae: mrnDate ? new Date(mrnDate) : null,
-        MRNAmountwithGST: mrnAmount?.toString(),
+        MRNBasicAmount: mrnBasicAmount ? mrnBasicAmount.toString() : "",
+        MRNGSTAmount: mrnGstAmount ? mrnGstAmount.toString() : "",
+        MRNOtherAmount: mrnOtherAmount ? mrnOtherAmount.toString() : "",
+        MRNAmountwithGST: totalMrnAmount ? totalMrnAmount.toString() : "",
         RequestedAmountforPayment: requestedAmount
           ? requestedAmount.toString()
           : "",
         FinalPaymentAgainstPO: finalPayment === "Yes",
         InstallationDetails: installationDetails,
+        InstallationRequestNumber:
+          finalPayment === "No" ? installationRequestNumber : "",
         RequesterRemarks: requesterRemarks,
         StatusFlow: "Pending for Approval",
         Status: "Pending for Approval",
@@ -396,15 +433,23 @@ const NewAdvanceform = ({ context, onClose }: any) => {
         PONumber: poNumber,
         PODate: poDate ? new Date(poDate) : null,
         POPaymentTerms: poTerms,
-        POAmount: poAmount ? poAmount.toString() : "",
+        POBasicAmount: poBasicAmount ? poBasicAmount.toString() : "",
+        POGSTAmount: poGstAmount ? poGstAmount.toString() : "",
+        POOtherAmount: poOtherAmount ? poOtherAmount.toString() : "",
+        POAmount: totalPoAmount ? totalPoAmount.toString() : "",
         MRNNumber: mrnNumber,
         MRNDtae: mrnDate ? new Date(mrnDate) : null,
-        MRNAmountwithGST: mrnAmount?.toString(),
+        MRNBasicAmount: mrnBasicAmount ? mrnBasicAmount.toString() : "",
+        MRNGSTAmount: mrnGstAmount ? mrnGstAmount.toString() : "",
+        MRNOtherAmount: mrnOtherAmount ? mrnOtherAmount.toString() : "",
+        MRNAmountwithGST: totalMrnAmount ? totalMrnAmount.toString() : "",
         RequestedAmountforPayment: requestedAmount
           ? requestedAmount.toString()
           : "",
         FinalPaymentAgainstPO: finalPayment === "Yes",
         InstallationDetails: installationDetails,
+        InstallationRequestNumber:
+          finalPayment === "No" ? installationRequestNumber : "",
         RequesterRemarks: requesterRemarks,
         StatusFlow: "Draft",
         Status: "Draft",
@@ -532,7 +577,7 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">
-                      Vendor Code&nbsp;<span className="required">*</span>
+                      Vendor Name&nbsp;<span className="required">*</span>
                     </label>
                     <select
                       value={selectedVendorId || ""}
@@ -551,15 +596,15 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                       <option value="">Select Vendor</option>
                       {vendors.map((v) => (
                         <option key={v.Id} value={v.Id}>
-                          {v.VendorCode}
+                          {v.VendorName}
                         </option>
                       ))}
                     </select>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">Vendor Name</label>
+                    <label className="font">Vendor Code</label>
                     <input
-                      value={selectedVendorName}
+                      value={selectedVendorCode}
                       className="form-control readonly"
                       readOnly
                     />
@@ -590,24 +635,58 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                   </div>
                   <div className="col-md-4">
                     <label className="font">
-                      PO Amount (GST)&nbsp;<span className="required">*</span>
-                    </label>
-                    <input
-                      value={poAmount}
-                      className="form-control"
-                      onChange={(e) =>
-                        handleNumberChange(e.target.value, setPoAmount)
-                      }
-                    />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="font">
                       PO Payment Terms&nbsp;<span className="required">*</span>
                     </label>
                     <input
                       value={poTerms}
                       className="form-control"
                       onChange={(e) => setPoTerms(e.target.value)}
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">
+                      PO Basic Amount&nbsp;<span className="required">*</span>
+                    </label>
+                    <input
+                      value={poBasicAmount}
+                      className="form-control"
+                      onChange={(e) =>
+                        handleNumberChange(e.target.value, setPoBasicAmount)
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">
+                      PO GST Amount&nbsp;<span className="required">*</span>
+                    </label>
+                    <input
+                      value={poGstAmount}
+                      className="form-control"
+                      onChange={(e) =>
+                        handleNumberChange(e.target.value, setPoGstAmount)
+                      }
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">
+                      PO Other Amount&nbsp;<span className="required">*</span>
+                    </label>
+                    <input
+                      value={poOtherAmount}
+                      className="form-control"
+                      onChange={(e) =>
+                        handleNumberChange(e.target.value, setPoOtherAmount)
+                      }
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">Total PO Amount</label>
+                    <input
+                      value={totalPoAmount ? totalPoAmount.toFixed(2) : ""}
+                      className="form-control readonly"
+                      readOnly
                     />
                   </div>
                 </div>
@@ -642,15 +721,48 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                   </div>
                   <div className="col-md-4">
                     <label className="font">
-                      MRN Amount Including (GST)&nbsp;
-                      <span className="required">*</span>
+                      MRN Basic Amount&nbsp;<span className="required">*</span>
                     </label>
                     <input
-                      value={mrnAmount}
+                      value={mrnBasicAmount}
                       onChange={(e) =>
-                        handleNumberChange(e.target.value, setMrnAmount)
+                        handleNumberChange(e.target.value, setMrnBasicAmount)
                       }
                       className="form-control"
+                    />
+                  </div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">
+                      MRN GST Amount&nbsp;<span className="required">*</span>
+                    </label>
+                    <input
+                      value={mrnGstAmount}
+                      onChange={(e) =>
+                        handleNumberChange(e.target.value, setMrnGstAmount)
+                      }
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">
+                      MRN Other Amount&nbsp;<span className="required">*</span>
+                    </label>
+                    <input
+                      value={mrnOtherAmount}
+                      onChange={(e) =>
+                        handleNumberChange(e.target.value, setMrnOtherAmount)
+                      }
+                      className="form-control"
+                    />
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">Total MRN Amount</label>
+                    <input
+                      value={totalMrnAmount ? totalMrnAmount.toFixed(2) : ""}
+                      className="form-control readonly"
+                      readOnly
                     />
                   </div>
                 </div>
@@ -729,6 +841,22 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                       >
                         Open Installation Form
                       </button>
+                    </div>
+                  )}
+
+                  {finalPayment === "No" && (
+                    <div className="col-md-4">
+                      <label className="font">
+                        Installation Request Number&nbsp;
+                        <span className="required">*</span>
+                      </label>
+                      <input
+                        value={installationRequestNumber}
+                        className="form-control"
+                        onChange={(e) =>
+                          setInstallationRequestNumber(e.target.value)
+                        }
+                      />
                     </div>
                   )}
                 </div>

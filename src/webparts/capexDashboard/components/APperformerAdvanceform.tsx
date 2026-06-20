@@ -46,8 +46,9 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
   const [voucherDate, setVoucherDate] = useState("");
   const [voucherNumber, setVoucherNumber] = useState("");
   const [selectedVendorName, setSelectedVendorName] = useState("");
-  const [vendors, setVendors] = useState<IVendor[]>([]);
+  const [selectedVendorCode, setSelectedVendorCode] = useState(""); // FIX: plain text vendor code
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
+  const [vendors, setVendors] = useState<IVendor[]>([]);
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
@@ -75,12 +76,13 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
         return;
       }
       const data = await sp.web.lists
-        .getByTitle("CapexPayment")
+        .getByTitle("CapexAdvance")
         .items.select(
           "PONumber",
           "RequestAdvanceAmount",
           "Created",
           "VoucherDate",
+          "VouchingNumber",
           "PaidAmount",
           "Status",
           "VendorCode/Id",
@@ -151,16 +153,22 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
           "Location",
           "RM",
           "HOD",
-          "VendorCode/Id",
-          "VendorCode/Title",
+          "VendorCode",       // FIX: plain text field, no expand needed
           "VendorName",
           "PODate",
           "InstallationDetails",
+          "InstallationRequestNumber",
           "FinalPaymentAgainstPO",
           "POPaymentTerms",
+          "POBasicAmount",
+          "POGSTAmount",
+          "POOtherAmount",
           "POAmount",
           "MRNNumber",
           "MRNDtae",
+          "MRNBasicAmount",
+          "MRNGSTAmount",
+          "MRNOtherAmount",
           "MRNAmountwithGST",
           "PONumber",
           "RequestedAmountforPayment",
@@ -172,10 +180,14 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
           "RequestorName",
         )();
       setItemData(item);
-      const vendorId = item?.VendorCode?.Id || null;
-      setSelectedVendorId(vendorId);
+
+      // FIX: VendorCode is plain text — read it directly
+      const vendorCodeText: string = item?.VendorCode || "";
+      setSelectedVendorCode(vendorCodeText);
       setSelectedVendorName(item?.VendorName || "");
+
       if (item.CapexId) await getAttachments(item.CapexId);
+
       if (item.ApprovalMatrix) {
         try {
           const parsed =
@@ -189,6 +201,7 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
       } else {
         setApprovalMatrix([]);
       }
+
       if (item.WorkflowHistory) {
         try {
           const parsed =
@@ -217,21 +230,16 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
     void loadData();
   }, [context, itemId]);
 
+  // FIX: resolve vendorId from the plain-text VendorCode once vendors list is loaded
   useEffect(() => {
-    if (selectedVendorId) void getPreviousAdvances(selectedVendorId);
-  }, [selectedVendorId]);
+    if (!selectedVendorCode || vendors.length === 0) return;
+    const matched = vendors.find((v) => v.VendorCode === selectedVendorCode);
+    if (matched) {
+      setSelectedVendorId(matched.Id);
+      void getPreviousAdvances(matched.Id);
+    }
+  }, [selectedVendorCode, vendors]);
 
-  // ===== Ribbon color logic =====
-  // Driven by the overall item Status, not each step's own Status string.
-  // Rules:
-  //   Paid        → Initiator + all approver steps = green
-  //   Reject      → step with Status "Reject"/"Rejected" = red;
-  //                 steps before it = green; steps after = yellow
-  //   Send Back   → Initiator = orange (send-back target);
-  //                 all approver steps = yellow
-  //   Default     → already-Approved steps = green;
-  //                 the In Progress step = orange (current approver);
-  //                 remaining steps = yellow
   const overallStatus: string = itemData?.Status || "";
 
   const buildRibbonSteps = () => {
@@ -267,7 +275,6 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
       );
     }
 
-    // Default: in-progress (Pending for Vouching Update, etc.)
     return steps.map((s) => {
       if (s.Status === "Approved") return { ...s, _color: "approved" };
       if (s.Status === "In Progress") return { ...s, _color: "active" };
@@ -277,11 +284,16 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";   // green
-      case "active":   return "active";     // orange — current approver / send-back target
-      case "upcoming": return "upcoming";   // yellow — not yet reached
-      case "rejected": return "rejected";   // red
-      default: return "";
+      case "approved":
+        return "approved";
+      case "active":
+        return "active";
+      case "upcoming":
+        return "upcoming";
+      case "rejected":
+        return "rejected";
+      default:
+        return "";
     }
   };
 
@@ -675,12 +687,12 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
               <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
-                    <label className="font">Vendor Code</label> : &nbsp;&nbsp;
-                    <label className="fonttext">{itemData.VendorCode}</label>
-                  </div>
-                  <div className="col-md-4">
                     <label className="font">Vendor Name</label> : &nbsp;&nbsp;
                     <label className="fonttext">{itemData.VendorName}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">Vendor Code</label> : &nbsp;&nbsp;
+                    <label className="fonttext">{itemData.VendorCode}</label>
                   </div>
                   <div className="col-md-4">
                     <label className="font">PO Number</label> : &nbsp;&nbsp;
@@ -703,7 +715,24 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                     </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">PO Amount</label> : &nbsp;&nbsp;
+                    <label className="font">PO Basic Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">{itemData.POBasicAmount}</label>
+                  </div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">PO GST Amount</label> : &nbsp;&nbsp;
+                    <label className="fonttext">{itemData.POGSTAmount}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">PO Other Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">{itemData.POOtherAmount}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">Total PO Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">{itemData.POAmount}</label>
                   </div>
                 </div>
@@ -726,7 +755,29 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                     </label>
                   </div>
                   <div className="col-md-4">
-                    <label className="font">MRN Amount</label> : &nbsp;&nbsp;
+                    <label className="font">MRN Basic Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.MRNBasicAmount}
+                    </label>
+                  </div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">MRN GST Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">{itemData?.MRNGSTAmount}</label>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">MRN Other Amount</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.MRNOtherAmount}
+                    </label>
+                  </div>
+                  <div className="col-md-4">
+                    <label className="font">Total MRN Amount</label> :
+                    &nbsp;&nbsp;
                     <label className="fonttext">
                       {itemData?.MRNAmountwithGST}
                     </label>
@@ -742,7 +793,126 @@ const APperformerAdvanceform = ({ context, itemId, onClose }: any) => {
                   </div>
                 </div>
               </div>
-              <div className="main-formcontainer" style={{ marginTop: "10px" }}>
+
+              <div className="heading1" style={{ marginTop: "10px" }}>
+                <label>Previous Advances</label>
+              </div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-12">
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
+                        <thead
+                          className="text-white"
+                          style={{ backgroundColor: "rgb(60, 62, 69)" }}
+                        >
+                          <tr>
+                            <th className="px-4 py-2">PO Number</th>
+                            <th className="px-4 py-2">Previous Advance</th>
+                            <th className="px-4 py-2">Requested Date</th>
+                            <th className="px-4 py-2">Paid Date</th>
+                            <th className="px-4 py-2">Voucher No</th>
+                            <th className="px-4 py-2">Settled Amount</th>
+                            <th className="px-4 py-2">Pending Advance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previousAdvances.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={7}
+                                style={{ textAlign: "center", padding: "10px" }}
+                              >
+                                No previous advances available
+                              </td>
+                            </tr>
+                          ) : (
+                            previousAdvances.map((item: any, index: number) => {
+                              const pending = Math.max(
+                                0,
+                                Number(item.RequestAdvanceAmount || 0) -
+                                  Number(item.PaidAmount || 0),
+                              );
+                              return (
+                                <tr key={index}>
+                                  <td className="px-4 py-2">{item.PONumber}</td>
+                                  <td className="px-4 py-2">
+                                    {item.RequestAdvanceAmount}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.Created
+                                      ? new Date(
+                                          item.Created,
+                                        ).toLocaleDateString("en-GB")
+                                      : ""}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.VoucherDate
+                                      ? new Date(
+                                          item.VoucherDate,
+                                        ).toLocaleDateString("en-GB")
+                                      : ""}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.VouchingNumber}
+                                  </td>
+                                  <td className="px-4 py-2">
+                                    {item.PaidAmount}
+                                  </td>
+                                  <td className="px-4 py-2">{pending}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="heading1" style={{ marginTop: "10px" }}>
+                <label>Final Payment Details</label>
+              </div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">Final Payment Against PO</label> :
+                    &nbsp;&nbsp;
+                    <label className="fonttext">
+                      {itemData?.FinalPaymentAgainstPO ? "Yes" : "No"}
+                    </label>
+                  </div>
+                </div>
+                {itemData?.FinalPaymentAgainstPO && (
+                  <div className="row mb-20">
+                    <div className="col-md-6">
+                      <label className="font">Installation Details</label> :
+                      &nbsp;&nbsp;
+                      <label className="fonttext">
+                        {itemData?.InstallationDetails}
+                      </label>
+                    </div>
+                  </div>
+                )}
+                {!itemData?.FinalPaymentAgainstPO && (
+                  <div className="row mb-20">
+                    <div className="col-md-6">
+                      <label className="font">
+                        Installation Request Number
+                      </label>{" "}
+                      : &nbsp;&nbsp;
+                      <label className="fonttext">
+                        {itemData?.InstallationRequestNumber}
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="heading1" style={{ marginTop: "10px" }}>
+                <label>Voucher Details</label>
+              </div>
+              <div className="main-formcontainer">
                 <div className="row mb-20">
                   <div className="col-md-4">
                     <label className="font">Voucher Date</label>

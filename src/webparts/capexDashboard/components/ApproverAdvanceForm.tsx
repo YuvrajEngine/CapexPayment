@@ -42,6 +42,8 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
   const [previousAdvances, setPreviousAdvances] = useState<any[]>([]);
   const [finalPayment, setFinalPayment] = useState("");
   const [installationDetails, setInstallationDetails] = useState("");
+  // Shown when "Whether this is the Final Payment against the PO" = No
+  const [installationRequestNumber, setInstallationRequestNumber] = useState("");
   const [selectedVendorId, setSelectedVendorId] = useState<number | null>(null);
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
@@ -56,10 +58,10 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
     try {
       if (!vendorId) { setPreviousAdvances([]); return; }
       const data = await sp.web.lists
-        .getByTitle("CapexPayment")
+        .getByTitle("CapexAdvance")
         .items.select(
           "PONumber", "RequestAdvanceAmount", "Created",
-          "VoucherDate", "PaidAmount", "Status", "VendorCode/Id",
+          "VoucherDate", "VouchingNumber", "PaidAmount", "Status", "VendorCode/Id",
         )
         .expand("VendorCode")
         .filter(`VendorCode/Id eq ${vendorId} and Status eq 'Paid'`)
@@ -102,16 +104,21 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
         .select(
           "ID", "Title", "Created", "EmployeeName", "Email", "EmployeeCode",
           "ContactNo", "EmployeeStatus", "Division", "Location", "RM", "HOD",
-          "VendorCode/Id", "VendorCode/Title", "VendorName", "PODate",
-          "POPaymentTerms", "POAmount", "MRNNumber", "MRNDtae", "MRNAmountwithGST",
+          "VendorCode", "VendorName", "PODate",
+          "POPaymentTerms", "POBasicAmount", "POGSTAmount", "POOtherAmount", "POAmount",
+          "MRNNumber", "MRNDtae", "MRNBasicAmount", "MRNGSTAmount", "MRNOtherAmount", "MRNAmountwithGST",
           "PONumber", "RequestedAmountforPayment", "Status", "CurrentApproverId",
-          "CapexId", "InstallationDetails", "FinalPaymentAgainstPO",
+          "CapexId", "InstallationDetails", "InstallationRequestNumber", "FinalPaymentAgainstPO",
           "ApprovalMatrix", "WorkflowHistory", "RequestorName",
         )();
 
       setItemData(item);
-      const vendorId = item?.VendorCode?.Id || null;
-      setSelectedVendorId(vendorId);
+      // VendorCode on CapexPayment is a plain text field (the vendor code string),
+      // NOT a SharePoint Lookup — so there's no item.VendorCode.Id to read here.
+      // We resolve the real VendorMaster list-item Id by matching this text value
+      // against the vendors list once it's loaded (see the useEffect below),
+      // the same way ViewAdvanceForm/EditAdvanceForm do it.
+      setSelectedVendorCode(item?.VendorCode || "");
       setSelectedVendorName(item?.VendorName || "");
       if (item.CapexId) await getAttachments(item.CapexId);
 
@@ -144,9 +151,20 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
     void loadData();
   }, [context, itemId]);
 
+  // Resolve the VendorMaster Id by matching the saved VendorCode text against the
+  // vendors list (same pattern as ViewAdvanceForm/EditAdvanceForm), then use that
+  // real Id to pull Previous Advances. This fixes the table always showing empty,
+  // which happened because selectedVendorId was previously read from
+  // item.VendorCode.Id — undefined, since VendorCode is text, not a Lookup.
   useEffect(() => {
-    if (selectedVendorId) void getPreviousAdvances(selectedVendorId);
-  }, [selectedVendorId]);
+    if (vendors.length > 0 && selectedVendorCode) {
+      const match = vendors.find((v) => v.VendorCode === selectedVendorCode);
+      if (match) {
+        setSelectedVendorId(match.Id);
+        void getPreviousAdvances(match.Id);
+      }
+    }
+  }, [vendors, selectedVendorCode]);
 
   const handleApprove = async () => {
     if (actionLock.current) return;
@@ -298,17 +316,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
 
   const handleExit = () => onClose();
 
-  // ===== Ribbon color logic =====
-  // Driven by the overall item Status, not each step's own Status string.
-  // Rules:
-  //   Paid        → Initiator + all approver steps = green
-  //   Reject      → step with Status "Reject"/"Rejected" = red;
-  //                 steps before it = green; steps after = yellow
-  //   Send Back   → Initiator = orange (send-back target);
-  //                 all approver steps = yellow
-  //   Default     → already-Approved steps = green;
-  //                 the In Progress step = orange (current approver);
-  //                 remaining steps = yellow
   const overallStatus: string = itemData?.Status || "";
 
   const buildRibbonSteps = () => {
@@ -344,7 +351,6 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
       );
     }
 
-    // Default: in-progress (Pending for Approval, etc.)
     return steps.map((s) => {
       if (s.Status === "Approved") return { ...s, _color: "approved" };
       if (s.Status === "In Progress") return { ...s, _color: "active" };
@@ -354,10 +360,10 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";   // green
-      case "active":   return "active";     // orange — current approver / send-back target
-      case "upcoming": return "upcoming";   // yellow — not yet reached
-      case "rejected": return "rejected";   // red
+      case "approved": return "approved";
+      case "active":   return "active";
+      case "upcoming": return "upcoming";
+      case "rejected": return "rejected";
       default: return "";
     }
   };
@@ -414,8 +420,8 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
               <div className="heading1" style={{ marginTop: "10px" }}><label>Vendor & PO Details</label></div>
               <div className="main-formcontainer">
                 <div className="row mb-20">
-                  <div className="col-md-4"><label className="font">Vendor Code</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.VendorCode}</label></div>
                   <div className="col-md-4"><label className="font">Vendor Name</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.VendorName}</label></div>
+                  <div className="col-md-4"><label className="font">Vendor Code</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.VendorCode}</label></div>
                   <div className="col-md-4"><label className="font">PO Number</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.PONumber}</label></div>
                 </div>
                 <div className="row mb-20">
@@ -424,7 +430,12 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
                     <label className="fonttext">{itemData.PODate ? new Date(itemData.PODate).toLocaleDateString("en-GB") : ""}</label>
                   </div>
                   <div className="col-md-4"><label className="font">PO Terms</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POPaymentTerms}</label></div>
-                  <div className="col-md-4"><label className="font">PO Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POAmount}</label></div>
+                  <div className="col-md-4"><label className="font">PO Basic Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POBasicAmount}</label></div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4"><label className="font">PO GST Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POGSTAmount}</label></div>
+                  <div className="col-md-4"><label className="font">PO Other Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POOtherAmount}</label></div>
+                  <div className="col-md-4"><label className="font">Total PO Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData.POAmount}</label></div>
                 </div>
               </div>
 
@@ -436,10 +447,60 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
                     <label className="font">MRN Date</label> : &nbsp;&nbsp;
                     <label className="fonttext">{itemData?.MRNDtae ? new Date(itemData.MRNDtae).toLocaleDateString("en-GB") : ""}</label>
                   </div>
-                  <div className="col-md-4"><label className="font">MRN Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.MRNAmountwithGST}</label></div>
+                  <div className="col-md-4"><label className="font">MRN Basic Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.MRNBasicAmount}</label></div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4"><label className="font">MRN GST Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.MRNGSTAmount}</label></div>
+                  <div className="col-md-4"><label className="font">MRN Other Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.MRNOtherAmount}</label></div>
+                  <div className="col-md-4"><label className="font">Total MRN Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.MRNAmountwithGST}</label></div>
                 </div>
                 <div className="row mb-20">
                   <div className="col-md-4"><label className="font">Requested Amount</label> : &nbsp;&nbsp;<label className="fonttext">{itemData?.RequestedAmountforPayment}</label></div>
+                </div>
+              </div>
+
+              <div className="heading1" style={{ marginTop: "10px" }}><label>Previous Advances</label></div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-12">
+                    <div style={{ overflowX: "auto" }}>
+                      <table className="custom-table min-w-full bg-white rounded-2xl shadow-md">
+                        <thead className="text-white" style={{ backgroundColor: "rgb(60, 62, 69)" }}>
+                          <tr>
+                            <th className="px-4 py-2">PO Number</th>
+                            <th className="px-4 py-2">Previous Advance</th>
+                            <th className="px-4 py-2">Requested Date</th>
+                            <th className="px-4 py-2">Paid Date</th>
+                            <th className="px-4 py-2">Voucher No</th>
+                            <th className="px-4 py-2">Settled Amount</th>
+                            <th className="px-4 py-2">Pending Advance</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {previousAdvances.length === 0 ? (
+                            <tr>
+                              <td colSpan={7} style={{ textAlign: "center", padding: "10px" }}>No previous advances available</td>
+                            </tr>
+                          ) : (
+                            previousAdvances.map((item: any, index: number) => {
+                              const pending = Math.max(0, Number(item.RequestAdvanceAmount || 0) - Number(item.PaidAmount || 0));
+                              return (
+                                <tr key={index}>
+                                  <td className="px-4 py-2">{item.PONumber}</td>
+                                  <td className="px-4 py-2">{item.RequestAdvanceAmount}</td>
+                                  <td className="px-4 py-2">{item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : ""}</td>
+                                  <td className="px-4 py-2">{item.VoucherDate ? new Date(item.VoucherDate).toLocaleDateString("en-GB") : ""}</td>
+                                  <td className="px-4 py-2">{item.VouchingNumber}</td>
+                                  <td className="px-4 py-2">{item.PaidAmount}</td>
+                                  <td className="px-4 py-2">{pending}</td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -455,10 +516,14 @@ const ApproverAdvanceForm: React.FC<IProps> = ({ context, itemId, onClose }) => 
                     </div>
                     {itemData?.FinalPaymentAgainstPO && (
                       <div className="row mb-20">
-                        {/* <div className="col-md-6">
-                          <label className="font">Installation Details</label> : &nbsp;&nbsp;
-                          <label className="fonttext">{itemData?.InstallationDetails}</label>
-                        </div> */}
+                      </div>
+                    )}
+                    {!itemData?.FinalPaymentAgainstPO && (
+                      <div className="row mb-20">
+                        <div className="col-md-4">
+                          <label className="font">Installation Request Number</label> : &nbsp;&nbsp;
+                          <label className="fonttext">{itemData?.InstallationRequestNumber}</label>
+                        </div>
                       </div>
                     )}
                   </div>
