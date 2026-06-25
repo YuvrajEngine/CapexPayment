@@ -59,6 +59,17 @@ const NewAdvanceform = ({ context, onClose }: any) => {
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [installationRequestNumber, setInstallationRequestNumber] = useState("");
 
+  const [vendorSearch, setVendorSearch] = useState("");
+  const [vendorDropdownOpen, setVendorDropdownOpen] = useState(false);
+  const vendorDropdownRef = useRef<HTMLDivElement>(null);
+  const vendorSearchRef = useRef<HTMLInputElement>(null);
+
+  const filteredVendors = vendors.filter(
+    (v) =>
+      v.VendorName.toLowerCase().includes(vendorSearch.toLowerCase()) ||
+      v.VendorCode.toLowerCase().includes(vendorSearch.toLowerCase()),
+  );
+
   const employeeRef = useRef<any>({});
 
   const totalPoAmount =
@@ -455,7 +466,6 @@ const NewAdvanceform = ({ context, onClose }: any) => {
       const WorkflowHistory = [
         {
           CurrentApprover: emp.EmployeeName,
-          // ActionTaken: "Draft",
           Comment: requesterRemarks || "",
           Date: new Date().toISOString(),
         },
@@ -489,6 +499,26 @@ const NewAdvanceform = ({ context, onClose }: any) => {
     void getLoggedInUser();
     void getVendors();
   }, [context]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        vendorDropdownRef.current &&
+        !vendorDropdownRef.current.contains(event.target as Node)
+      ) {
+        setVendorDropdownOpen(false);
+        setVendorSearch("");
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    if (vendorDropdownOpen && vendorSearchRef.current) {
+      vendorSearchRef.current.focus();
+    }
+  }, [vendorDropdownOpen]);
 
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
@@ -575,27 +605,139 @@ const NewAdvanceform = ({ context, onClose }: any) => {
                     <label className="font">
                       Vendor Name&nbsp;<span className="required">*</span>
                     </label>
-                    <select
-                      value={selectedVendorId || ""}
-                      onChange={(e) => {
-                        const id = Number(e.target.value);
-                        const vendor = vendors.find((v) => v.Id === id);
-                        setSelectedVendorId(id);
-                        setSelectedVendorName(vendor?.VendorName || "");
-                        setSelectedVendorCode(vendor?.VendorCode || "");
-                        setPoNumber("");
-                        if (id > 0) void getPreviousAdvances(id);
-                        else setPreviousAdvances([]);
-                      }}
-                      className="formtext-control"
+                    <div
+                      ref={vendorDropdownRef}
+                      style={{ position: "relative" }}
                     >
-                      <option value="">Select Vendor</option>
-                      {vendors.map((v) => (
-                        <option key={v.Id} value={v.Id}>
-                          {v.VendorName}
-                        </option>
-                      ))}
-                    </select>
+                      <div
+                        className="formtext-control"
+                        onClick={() => setVendorDropdownOpen((prev) => !prev)}
+                        style={{
+                          cursor: "pointer",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                          userSelect: "none",
+                          minHeight: "38px",
+                          padding: "6px 10px",
+                        }}
+                      >
+                        <span style={{ color: selectedVendorName ? "inherit" : "#999" }}>
+                          {selectedVendorName || "Select Vendor"}
+                        </span>
+                        <span style={{ fontSize: "10px", marginLeft: "8px" }}>
+                          {vendorDropdownOpen ? "▲" : "▼"}
+                        </span>
+                      </div>
+
+                      {vendorDropdownOpen && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            zIndex: 1000,
+                            backgroundColor: "#fff",
+                            border: "1px solid #ccc",
+                            borderRadius: "4px",
+                            boxShadow: "0 4px 8px rgba(0,0,0,0.15)",
+                          }}
+                        >
+                          <div style={{ padding: "6px" }}>
+                            <input
+                              ref={vendorSearchRef}
+                              type="text"
+                              value={vendorSearch}
+                              onChange={(e) => setVendorSearch(e.target.value)}
+                              placeholder="Search vendor..."
+                              className="form-control"
+                              style={{ fontSize: "13px" }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          <ul
+                            style={{
+                              listStyle: "none",
+                              margin: 0,
+                              padding: 0,
+                              maxHeight: "200px",
+                              overflowY: "auto",
+                            }}
+                          >
+                            <li
+                              onClick={() => {
+                                setSelectedVendorId(null);
+                                setSelectedVendorName("");
+                                setSelectedVendorCode("");
+                                setPoNumber("");
+                                setPreviousAdvances([]);
+                                setVendorDropdownOpen(false);
+                                setVendorSearch("");
+                              }}
+                              style={{
+                                padding: "8px 12px",
+                                cursor: "pointer",
+                                color: "#999",
+                                borderBottom: "1px solid #f0f0f0",
+                              }}
+                              onMouseEnter={(e) =>
+                                ((e.currentTarget as HTMLLIElement).style.backgroundColor = "#f5f5f5")
+                              }
+                              onMouseLeave={(e) =>
+                                ((e.currentTarget as HTMLLIElement).style.backgroundColor = "transparent")
+                              }
+                            >
+                              Select Vendor
+                            </li>
+                            {filteredVendors.length === 0 ? (
+                              <li
+                                style={{
+                                  padding: "8px 12px",
+                                  color: "#999",
+                                  fontSize: "13px",
+                                }}
+                              >
+                                No vendors found
+                              </li>
+                            ) : (
+                              filteredVendors.map((v) => (
+                                <li
+                                  key={v.Id}
+                                  onClick={() => {
+                                    setSelectedVendorId(v.Id);
+                                    setSelectedVendorName(v.VendorName);
+                                    setSelectedVendorCode(v.VendorCode);
+                                    setPoNumber("");
+                                    void getPreviousAdvances(v.Id);
+                                    setVendorDropdownOpen(false);
+                                    setVendorSearch("");
+                                  }}
+                                  style={{
+                                    padding: "8px 12px",
+                                    cursor: "pointer",
+                                    fontSize: "13px",
+                                    backgroundColor:
+                                      selectedVendorId === v.Id ? "#e8f0fe" : "transparent",
+                                    borderBottom: "1px solid #f0f0f0",
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (selectedVendorId !== v.Id)
+                                      (e.currentTarget as HTMLLIElement).style.backgroundColor = "#f5f5f5";
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (selectedVendorId !== v.Id)
+                                      (e.currentTarget as HTMLLIElement).style.backgroundColor = "transparent";
+                                  }}
+                                >
+                                  {v.VendorName}
+                                </li>
+                              ))
+                            )}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <div className="col-md-4">
                     <label className="font">Vendor Code</label>
@@ -1045,4 +1187,4 @@ const NewAdvanceform = ({ context, onClose }: any) => {
   );
 };
 
-export default NewAdvanceform;    
+export default NewAdvanceform;
