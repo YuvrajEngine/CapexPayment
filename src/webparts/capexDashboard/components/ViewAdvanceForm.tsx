@@ -63,6 +63,15 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const [approvalMatrix, setApprovalMatrix] = useState<any[]>([]);
   const [workflowHistory, setWorkflowHistory] = useState<any[]>([]);
 
+  const siteUrl = context?.pageContext?.web?.absoluteUrl || "";
+
+  const toAbsoluteUrl = (serverRelativeUrl: string) => {
+    if (!serverRelativeUrl) return "#";
+    if (serverRelativeUrl.startsWith("http")) return serverRelativeUrl;
+    const origin = siteUrl.split("/sites/")[0] || "";
+    return `${origin}${serverRelativeUrl}`;
+  };
+
   const getPreviousAdvances = async (vendorId: number) => {
     try {
       if (!vendorId) { setPreviousAdvances([]); return; }
@@ -102,16 +111,13 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     try {
       if (!capexId) return;
       const safeCapexId = capexId.replace(/\//g, "_");
-
       const libraryRootFolder = await sp.web.lists
         .getByTitle(UTR_DOCS_LIBRARY)
         .rootFolder();
-
       const utrFolderPath = `${libraryRootFolder.ServerRelativeUrl}/${safeCapexId}`;
       const files = await sp.web.getFolderByServerRelativePath(utrFolderPath).files();
       setUtrAttachments(files || []);
     } catch (error) {
-      // Folder won't exist until AP Performer uploads UTR docs — safe to ignore
       console.log(`No UTR attachments found in ${UTR_DOCS_LIBRARY} for ${capexId}`, error);
       setUtrAttachments([]);
     }
@@ -165,8 +171,8 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
     setUTRRemarks(formData.UTRRemarks || "");
 
     if (formData.CapexId) {
-      void getAttachments(formData.CapexId);     
-      void getUTRAttachments(formData.CapexId);  
+      void getAttachments(formData.CapexId);
+      void getUTRAttachments(formData.CapexId);
     }
 
     if (formData?.ApprovalMatrix) {
@@ -199,6 +205,9 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
   const handleExit = () => { if (onClose) onClose(); else window.location.reload(); };
 
   const overallStatus: string = formData?.Status || "";
+
+  const hasVoucherData = !!(VouchingNumber || voucherDate);
+  const hasUTRData = !!(UTRNumber || UTRDate || UTRRemarks || utrAttachments.length > 0);
 
   const buildRibbonSteps = () => {
     const initiatorStep = {
@@ -238,13 +247,14 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const getStepClass = (color: string) => {
     switch (color) {
-      case "approved": return "approved";   
-      case "active": return "active";       
-      case "upcoming": return "upcoming";   
-      case "rejected": return "rejected";   
+      case "approved": return "approved";
+      case "active": return "active";
+      case "upcoming": return "upcoming";
+      case "rejected": return "rejected";
       default: return "";
     }
   };
+
   return (
     <div className="MainUplodForm" style={{ margin: "5px 0px" }}>
       <div className="row"><div className="col-md-12"><div className="Main-Boxpoup">
@@ -394,44 +404,53 @@ const ViewAdvanceForm = ({ context, formData, onClose }: any) => {
                 <label className="font">Attachments</label>
                 {attachments.length > 0 ? (
                   <ul>{attachments.map((file: any, index: number) => (
-                    <li key={index}><a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">{file.Name}</a></li>
+                    <li key={index}>
+                      <a href={toAbsoluteUrl(file.ServerRelativeUrl)} target="_blank" rel="noopener noreferrer">{file.Name}</a>
+                    </li>
                   ))}</ul>
                 ) : <p>No attachments</p>}
               </div>
             </div>
           </div>
 
-          {/* Voucher Details */}
-          <div className="heading1" style={{ marginTop: "10px" }}><label>Voucher Details</label></div>
-          <div className="main-formcontainer">
-            <div className="row mb-20">
-              <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
-              <div className="col-md-6"><label className="font">Voucher Number</label> : &nbsp;&nbsp;<label className="fonttext">{VouchingNumber}</label></div>
-            </div>
-          </div>
-
-          <div className="heading1" style={{ marginTop: "10px" }}><label>UTR Details</label></div>
-          <div className="main-formcontainer">
-            <div className="row mb-20">
-              <div className="col-md-4"><label className="font">UTR Date</label> : &nbsp;&nbsp;<label className="fonttext">{UTRDate}</label></div>
-              <div className="col-md-4"><label className="font">UTR Number</label> : &nbsp;&nbsp;<label className="fonttext">{UTRNumber}</label></div>
-              <div className="col-md-4"><label className="font">UTR Remarks</label> : &nbsp;&nbsp;<label className="fonttext">{UTRRemarks}</label></div>
-            </div>
-            <div className="row mb-20">
-              <div className="col-md-4">
-                <label className="font">UTR Attachments</label>
-                {utrAttachments.length > 0 ? (
-                  <ul>{utrAttachments.map((file: any, index: number) => (
-                    <li key={index}>
-                      <a href={file.ServerRelativeUrl} target="_blank" rel="noopener noreferrer">
-                        {file.Name}
-                      </a>
-                    </li>
-                  ))}</ul>
-                ) : <p>No UTR attachments</p>}
+          {hasVoucherData && (
+            <>
+              <div className="heading1" style={{ marginTop: "10px" }}><label>Voucher Details</label></div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-6"><label className="font">Voucher Date</label> : &nbsp;&nbsp;<label className="fonttext">{voucherDate}</label></div>
+                  <div className="col-md-6"><label className="font">Voucher Number</label> : &nbsp;&nbsp;<label className="fonttext">{VouchingNumber}</label></div>
+                </div>
               </div>
-            </div>
-          </div>
+            </>
+          )}
+
+          {hasUTRData && (
+            <>
+              <div className="heading1" style={{ marginTop: "10px" }}><label>UTR Details</label></div>
+              <div className="main-formcontainer">
+                <div className="row mb-20">
+                  <div className="col-md-4"><label className="font">UTR Date</label> : &nbsp;&nbsp;<label className="fonttext">{UTRDate}</label></div>
+                  <div className="col-md-4"><label className="font">UTR Number</label> : &nbsp;&nbsp;<label className="fonttext">{UTRNumber}</label></div>
+                  <div className="col-md-4"><label className="font">UTR Remarks</label> : &nbsp;&nbsp;<label className="fonttext">{UTRRemarks}</label></div>
+                </div>
+                <div className="row mb-20">
+                  <div className="col-md-4">
+                    <label className="font">UTR Attachments</label>
+                    {utrAttachments.length > 0 ? (
+                      <ul>{utrAttachments.map((file: any, index: number) => (
+                        <li key={index}>
+                          <a href={toAbsoluteUrl(file.ServerRelativeUrl)} target="_blank" rel="noopener noreferrer">
+                            {file.Name}
+                          </a>
+                        </li>
+                      ))}</ul>
+                    ) : <p>No UTR attachments</p>}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className="heading1" style={{ marginTop: "10px" }}><label>Workflow History</label></div>
           <div className="main-formcontainer">
