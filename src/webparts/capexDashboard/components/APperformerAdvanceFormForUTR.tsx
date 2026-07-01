@@ -765,9 +765,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                             <th className="px-4 py-2">Previous Advance</th>
                             <th className="px-4 py-2">Requested Date</th>
                             <th className="px-4 py-2">Paid Date</th>
-                            <th className="px-4 py-2">Voucher No</th>
+                            {/* <th className="px-4 py-2">Voucher No</th>
                             <th className="px-4 py-2">Settled Amount</th>
-                            <th className="px-4 py-2">Pending Advance</th>
+                            <th className="px-4 py-2">Pending Advance</th> */}
                           </tr>
                         </thead>
                         <tbody>
@@ -784,9 +784,9 @@ const APperformerAdvanceFormForUTR: React.FC<IProps> = ({
                                   <td className="px-4 py-2">{item.RequestAdvanceAmount}</td>
                                   <td className="px-4 py-2">{item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : ""}</td>
                                   <td className="px-4 py-2">{item.VoucherDate ? new Date(item.VoucherDate).toLocaleDateString("en-GB") : ""}</td>
-                                  <td className="px-4 py-2">{item.VouchingNumber}</td>
+                                  {/* <td className="px-4 py-2">{item.VouchingNumber}</td>
                                   <td className="px-4 py-2">{item.PaidAmount}</td>
-                                  <td className="px-4 py-2">{pending}</td>
+                                  <td className="px-4 py-2">{pending}</td> */}
                                 </tr>
                               );
                             })

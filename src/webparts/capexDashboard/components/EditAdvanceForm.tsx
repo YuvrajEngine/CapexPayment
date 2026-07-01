@@ -35,6 +35,8 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const [previousAdvances, setPreviousAdvances] = useState<IPreviousAdvance[]>([]);
   const [vendors, setVendors] = useState<IVendor[]>([]);
+  const tenantUrl = context.pageContext.site.absoluteUrl.split("/sites/")[0];
+  const vendorSp = spfi(`${tenantUrl}/sites/RLY_AccountsPayable_UAT`).using(SPFx(context));
   const [employee, setEmployee] = useState<any>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftSaving, setIsDraftSaving] = useState(false);
@@ -113,7 +115,7 @@ const EditAdvanceForm = ({ context, formData, onClose }: any) => {
 
   const getVendors = async () => {
     try {
-      const data = await sp.web.lists
+      const data = await vendorSp.web.lists
         .getByTitle("VendorMaster")
         .items.select("Id", "VendorCode", "VendorName", "Status")
         .filter("Status eq 'Active'")();
@@ -975,9 +977,9 @@ if (pageLoading) {
                             <th className="px-4 py-2">Previous Advance</th>
                             <th className="px-4 py-2">Requested Date</th>
                             <th className="px-4 py-2">Paid Date</th>
-                            <th className="px-4 py-2">Voucher No</th>
+                            {/* <th className="px-4 py-2">MRN No</th>
                             <th className="px-4 py-2">Settled Amount</th>
-                            <th className="px-4 py-2">Pending Advance</th>
+                            <th className="px-4 py-2">Pending Advance</th> */}
                           </tr>
                         </thead>
                         <tbody>
@@ -996,13 +998,13 @@ if (pageLoading) {
                                   <td className="px-4 py-2">{item.RequestAdvanceAmount}</td>
                                   <td className="px-4 py-2">{item.Created ? new Date(item.Created).toLocaleDateString("en-GB") : ""}</td>
                                   <td className="px-4 py-2">{item.VoucherDate ? new Date(item.VoucherDate).toLocaleDateString("en-GB") : ""}</td>
-                                  <td className="px-4 py-2">{item.VouchingNumber}</td>
+                                  {/* <td className="px-4 py-2">{item.VouchingNumber}</td>
                                   <td className="px-4 py-2">{item.PaidAmount}</td>
-                                  <td className="px-4 py-2">{pending}</td>
+                                  <td className="px-4 py-2">{pending}</td> */}
                                 </tr>
                               );
                             })
-                          )}
+                          )}     
                         </tbody>
                       </table>
                     </div>
